@@ -10,6 +10,17 @@ class InvestmentContract extends Contract {
         const googleAddress = '0x94FB29447e4b8FBA43e90eA46a2f51C2191f4Fea';
         const facebookAddress = '0x21A4a0D1499A20D503969190C5D98E4Ab51ca4C4';
 
+        const accounts = [
+            {
+                orgMsp: 'Org1MSP',
+                balance: 10000
+            },
+            {
+                orgMsp: 'Org2MSP',
+                balance: 10000
+            }
+        ]
+
         const companies = [
             {
                 addr: appleAddress,
@@ -92,6 +103,10 @@ class InvestmentContract extends Contract {
             await ctx.stub.putState(paper.id.toString(), Buffer.from(JSON.stringify(paper)));
         }
 
+        for(let account of accounts) {
+            await ctx.stub.putState(account.orgMsp, Buffer.from(JSON.stringify(account)));
+        }
+
     }
     
     async getPapers(ctx) {
@@ -121,17 +136,40 @@ class InvestmentContract extends Contract {
         return paper.toString();
     }
     
-    async buy(ctx, id, newOwner) {
+    async buy(ctx, id) {
+        
         const paperBytes = await ctx.stub.getState(id);
         if (!paperBytes || paperBytes.length === 0) {
             throw new Error(`Paper with id=${paperId} doesn't exist!`);
         }
+
         const paper = JSON.parse(paperBytes.toString());
-        if(paper.state != 'Issued' || paper.state != 'Trading') {
+
+        if(paper.state != 'Issued' && paper.state != 'Trading') {
             throw new Error('Paper is in redeemed state, transaction cannot be completed');
         }
-        paper.owner = newOwner;
-        await ctx.stub.putState(carNumber, Buffer.from(JSON.stringify(paper)));
+
+        const mspid = ctx.clientIdentity.getMSPID();
+        const account = ctx.stub.getState(mspid);
+        if(paper.price > account.balance) {
+            throw new Error('Insufficiant funds, transaction cannot be completed');
+        }
+
+        const ownerBytes = ctx.stub.getState(paper.owner); 
+        if(ownerBytes && ownerBytes.length) {
+            const prevOwner = JSON.parse(ownerBytes.toString());
+            prevOwner.balance += paper.price;
+            await ctx.stub.putState(paper.owner, Buffer.from(JSON.stringify(prevOwner)));
+        }
+
+        account.balance -= paper.price;
+        paper.owner = mspid;
+        await ctx.stub.putState(paper.id.toString(), Buffer.from(JSON.stringify(paper)));
+        await ctx.stub.putState(mspid, Buffer.from(JSON.stringify(account)));
+    }
+
+    async getIdentity(ctx) {
+        return ctx.clientIdentity.getMSPID()
     }
 }
 
