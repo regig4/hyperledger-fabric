@@ -55,8 +55,4 @@ peer chaincode invoke -o localhost:7050 --ordererTLSHostnameOverride orderer.exa
 sleep 6
 
 
-#peer chaincode query -C mychannel -n invest -c '{"Args":["getIdentity"]}'
-
-peer chaincode invoke -C mychannel -n invest -c '{"Args":["buy", "4"]}'
-
-#peer chaincode query -C mychannel -n invest -c '{"Args":["getPapers"]}'
+peer chaincode query -C mychannel -n invest -c '{"Args":["getPapers"]}'
